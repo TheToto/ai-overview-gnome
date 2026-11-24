@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=AI Overview
+Comment=Spotlight-style overlay for Google AI Mode, Gemini, and Antigravity
+Exec=ai-overview-desktop
+Icon=io.github.toto.AiOverviewDesktop
+Terminal=false
+Type=Application
+Categories=Utility;
+StartupWMClass=io.github.toto.AiOverviewDesktop

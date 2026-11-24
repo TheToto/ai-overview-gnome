@@ -1,0 +1,47 @@
+{
+  "id": "io.github.toto.AiOverviewDesktop",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "49",
+  "sdk": "org.gnome.Sdk",
+  "sdk-extensions": [
+    "org.freedesktop.Sdk.Extension.rust-stable"
+  ],
+  "command": "ai-overview-desktop",
+  "finish-args": [
+    "--share=ipc",
+    "--share=network",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--socket=pulseaudio",
+    "--device=dri",
+    "--talk-name=org.freedesktop.Flatpak"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/rust-stable/bin",
+    "build-args": [
+      "--share=network"
+    ],
+    "env": {
+      "CARGO_HOME": "/run/build/ai-overview-desktop/cargo"
+    }
+  },
+  "modules": [
+    {
+      "name": "ai-overview-desktop",
+      "buildsystem": "simple",
+      "build-commands": [
+        "cargo build --release --locked",
+        "install -Dm755 target/release/ai-overview-desktop /app/bin/ai-overview-desktop",
+        "install -Dm644 data/io.github.toto.AiOverviewDesktop.desktop /app/share/applications/io.github.toto.AiOverviewDesktop.desktop",
+        "install -Dm644 data/io.github.toto.AiOverviewDesktop.metainfo.xml /app/share/metainfo/io.github.toto.AiOverviewDesktop.metainfo.xml",
+        "install -Dm644 data/io.github.toto.AiOverviewDesktop.svg /app/share/icons/hicolor/scalable/apps/io.github.toto.AiOverviewDesktop.svg"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": ".."
+        }
+      ]
+    }
+  ]
+}

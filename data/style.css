@@ -1,0 +1,116 @@
+.spotlight-window {
+    border-radius: 16px;
+    border: 1px solid alpha(@borders, 0.85);
+}
+
+.spotlight-topbar {
+    padding: 9px 12px;
+    border-bottom: 1px solid alpha(@borders, 0.65);
+    background-color: @headerbar_bg_color;
+}
+
+.spotlight-search {
+    min-height: 36px;
+    font-size: 1.04em;
+    border-radius: 10px;
+}
+
+.spotlight-waveform-box {
+    min-height: 36px;
+    border-radius: 10px;
+    padding: 0 12px;
+    background-color: alpha(@accent_bg_color, 0.14);
+    border: 1px solid alpha(@accent_bg_color, 0.45);
+}
+
+.spotlight-progress {
+    min-height: 2px;
+}
+
+.spotlight-progress trough,
+.spotlight-progress progress {
+    min-height: 2px;
+    border-radius: 0;
+}
+
+.spotlight-loading-bar {
+    min-height: 4px;
+    border-radius: 999px;
+}
+
+.spotlight-loading-bar trough,
+.spotlight-loading-bar progress {
+    min-height: 4px;
+    border-radius: 999px;
+}
+
+.spotlight-reader {
+    background-color: @window_bg_color;
+}
+
+.spotlight-messages {
+    padding: 14px 18px;
+}
+
+.spotlight-user-bubble {
+    background-color: alpha(@accent_bg_color, 0.22);
+    border-radius: 14px;
+    padding: 8px 14px;
+    font-size: 1.0em;
+}
+
+.spotlight-ai-message {
+    font-size: 1.02em;
+    line-height: 1.38;
+}
+
+.spotlight-suggestions {
+    margin-top: 6px;
+}
+
+.spotlight-suggestion-btn {
+    border: 1px solid alpha(@borders, 0.7);
+    border-radius: 10px;
+    padding: 6px 12px;
+}
+
+.spotlight-followup-bar {
+    padding: 8px 12px;
+    border-top: 1px solid alpha(@borders, 0.65);
+    background-color: @headerbar_bg_color;
+}
+
+.spotlight-followup-entry {
+    min-height: 34px;
+    border-radius: 10px;
+}
+
+.spotlight-tools-expander {
+    margin-bottom: 4px;
+    font-size: 0.90em;
+    opacity: 0.9;
+}
+
+.spotlight-tools-list {
+    margin-left: 10px;
+    padding-left: 10px;
+    border-left: 2px solid alpha(@borders, 0.55);
+}
+
+.spotlight-tool-step-expander {
+    font-size: 0.92em;
+}
+
+.spotlight-tool-detail-box {
+    margin-top: 4px;
+    margin-bottom: 4px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background-color: alpha(@view_fg_color, 0.05);
+    border: 1px solid alpha(@borders, 0.5);
+}
+
+.spotlight-tool-detail {
+    font-family: monospace;
+    font-size: 0.86em;
+}

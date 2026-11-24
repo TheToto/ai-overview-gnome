@@ -1,0 +1,15 @@
+[package]
+name = "ai-overview-desktop"
+version = "0.1.0"
+edition = "2024"
+description = "Spotlight-style AI Overview overlay for GNOME using GTK4, Libadwaita, and WebKitGTK"
+
+[dependencies]
+dirs = "6"
+gtk4 = { version = "0.11", features = ["v4_12"] }
+libadwaita = { version = "0.9", features = ["v1_5"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+urlencoding = "2"
+webkit6 = { version = "0.6", features = ["v2_44"] }

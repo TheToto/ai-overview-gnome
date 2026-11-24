@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.toto.AiOverviewDesktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>AI Overview GNOME</name>
+  <summary>Spotlight-style AI launcher for GNOME (GTK4 + Libadwaita + WebKitGTK)</summary>
+  <developer id="io.github.thetoto">
+    <name>TheToto</name>
+  </developer>
+  <description>
+    <p>
+      AI Overview GNOME is a Spotlight-style overlay for GNOME Linux built with GTK4, Libadwaita,
+      and WebKitGTK 6.0. Query Google AI Mode, Gemini, Google Search, or Antigravity CLI from
+      keyboard shortcuts, voice dictation, CLI arguments, stdin, or the clipboard.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.toto.AiOverviewDesktop.desktop</launchable>
+  <url type="homepage">https://github.com/TheToto/ai-overview-gnome</url>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-11-24" />
+  </releases>
+</component>

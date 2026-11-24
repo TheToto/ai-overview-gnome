@@ -1,0 +1,7 @@
+{
+  "uuid": "ai-overview-dock@toto",
+  "name": "AI Overview Top Dock",
+  "description": "Docks AI Overview Desktop flush at the top-center of the screen on GNOME Wayland",
+  "shell-version": ["49", "50", "51"],
+  "version": 1
+}
