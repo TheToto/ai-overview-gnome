@@ -1,12 +1,82 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#3584e4"/>
-      <stop offset="100%" stop-color="#613583"/>
+    <!-- Translucent Adwaita glass tint -->
+    <linearGradient id="glassTint" x1="0.15" y1="0.1" x2="0.85" y2="0.9">
+      <stop offset="0%" stop-color="#99c1f1" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#62a0ea" stop-opacity="0.14"/>
     </linearGradient>
+    <linearGradient id="glassShine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Adwaita / MoreWaita 3D metal extrusion & face -->
+    <linearGradient id="ringExtrude" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#77767b"/>
+      <stop offset="100%" stop-color="#5e5c64"/>
+    </linearGradient>
+    <linearGradient id="ringFront" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="55%" stop-color="#deddda"/>
+      <stop offset="100%" stop-color="#c0bfbc"/>
+    </linearGradient>
+
+    <!-- Purple-to-cyan AI sparkle 3D extrusion & front face -->
+    <linearGradient id="sparkleExtrude" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+      <stop offset="0%" stop-color="#813d9c"/>
+      <stop offset="55%" stop-color="#613583"/>
+      <stop offset="100%" stop-color="#1c71d8"/>
+    </linearGradient>
+    <linearGradient id="sparkleFront" x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+      <stop offset="0%" stop-color="#e17bff"/>
+      <stop offset="40%" stop-color="#9b5cff"/>
+      <stop offset="72%" stop-color="#48a3ff"/>
+      <stop offset="100%" stop-color="#4ce2ff"/>
+    </linearGradient>
+
+    <!-- Subtle ambient drop shadow -->
+    <filter id="softShadow" x="-20%" y="-20%" width="145%" height="145%">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="2.2" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+    <filter id="sparkleShadow" x="-25%" y="-25%" width="155%" height="155%">
+      <feDropShadow dx="-1" dy="2.5" stdDeviation="2" flood-color="#1a1033" flood-opacity="0.35"/>
+    </filter>
   </defs>
-  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
-  <circle cx="58" cy="58" r="24" fill="none" stroke="#ffffff" stroke-width="8"/>
-  <line x1="76" y1="76" x2="96" y2="96" stroke="#ffffff" stroke-width="9" stroke-linecap="round"/>
-  <path d="M58 43 L61.5 54.5 L73 58 L61.5 61.5 L58 73 L54.5 61.5 L43 58 L54.5 54.5 Z" fill="#ffffff"/>
+
+  <!-- Magnifying glass (transparent background, Adwaita 3D extrusion) -->
+  <g filter="url(#softShadow)">
+    <!-- Translucent lens interior + diagonal shine -->
+    <circle cx="48" cy="68" r="24" fill="url(#glassTint)"/>
+    <path d="M 30 58 A 20 20 0 0 1 56 49 L 36 74 A 20 20 0 0 1 30 58 Z" fill="url(#glassShine)"/>
+
+    <!-- 3D bottom extrusion (dy=+4) -->
+    <g transform="translate(0 4)">
+      <line x1="65" y1="85" x2="88" y2="108" stroke="url(#ringExtrude)" stroke-width="13" stroke-linecap="round"/>
+      <circle cx="48" cy="68" r="24" fill="none" stroke="url(#ringExtrude)" stroke-width="12.5"/>
+    </g>
+
+    <!-- Luminous front face -->
+    <line x1="65" y1="85" x2="88" y2="108" stroke="url(#ringFront)" stroke-width="13" stroke-linecap="round"/>
+    <circle cx="48" cy="68" r="24" fill="none" stroke="url(#ringFront)" stroke-width="12.5"/>
+  </g>
+
+  <!-- Large 4-point rounded AI sparkle (with 3D extrusion) -->
+  <g transform="translate(86 42)" filter="url(#sparkleShadow)">
+    <g transform="translate(0 3.5)">
+      <path d="M 0 -24 C 3.6 -7, 7 -3.6, 24 0 C 7 3.6, 3.6 7, 0 24 C -3.6 7, -7 3.6, -24 0 C -7 -3.6, -3.6 -7, 0 -24 Z"
+            fill="url(#sparkleExtrude)" stroke="url(#sparkleExtrude)" stroke-width="3" stroke-linejoin="round"/>
+    </g>
+    <path d="M 0 -24 C 3.6 -7, 7 -3.6, 24 0 C 7 3.6, 3.6 7, 0 24 C -3.6 7, -7 3.6, -24 0 C -7 -3.6, -3.6 -7, 0 -24 Z"
+          fill="url(#sparkleFront)" stroke="url(#sparkleFront)" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+
+  <!-- Small 4-point rounded AI sparkle (with 3D extrusion) -->
+  <g transform="translate(103 72)" filter="url(#sparkleShadow)">
+    <g transform="translate(0 2.5)">
+      <path d="M 0 -13 C 2.1 -3.9, 3.9 -2.1, 13 0 C 3.9 2.1, 2.1 3.9, 0 13 C -2.1 3.9, -3.9 2.1, -13 0 C -3.9 -2.1, -2.1 -3.9, 0 -13 Z"
+            fill="url(#sparkleExtrude)" stroke="url(#sparkleExtrude)" stroke-width="2" stroke-linejoin="round"/>
+    </g>
+    <path d="M 0 -13 C 2.1 -3.9, 3.9 -2.1, 13 0 C 3.9 2.1, 2.1 3.9, 0 13 C -2.1 3.9, -3.9 2.1, -13 0 C -3.9 -2.1, -2.1 -3.9, 0 -13 Z"
+          fill="url(#sparkleFront)" stroke="url(#sparkleFront)" stroke-width="2" stroke-linejoin="round"/>
+  </g>
 </svg>

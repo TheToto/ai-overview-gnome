@@ -32,3 +32,4 @@ cargo build
 - **GNOME Wayland**: Applications cannot force exact `(x, y)` coordinates on Wayland. Use a borderless `adw::ApplicationWindow` with `WindowHandle` for dragging.
 - **Google OAuth**: Never inject custom CSS or JS into `accounts.google.com`. Keep `UserStyleSheet` allowlists scoped to `https://www.google.com/search*`.
 - **D-Bus Single Instance**: `stdin` is read before `app.run_with_args()` in `src/main.rs` and converted into `--query` so piped input works even when forwarding to an already-running background instance.
+- **Git**: Never run `git push` directly after making changes unless the user explicitly asks to push.
