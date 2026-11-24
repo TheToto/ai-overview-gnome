@@ -1,6 +1,4 @@
-use std::path::Path;
-use std::process::Command;
-
+use crate::config::{host_command, is_flatpak};
 use crate::i18n::tr;
 use crate::provider::Provider;
 
@@ -30,20 +28,6 @@ impl ShortcutKind {
             ShortcutKind::Normal => "AI Overview",
             ShortcutKind::Voice => tr("AI Overview (Voice)", "AI Overview (Vocal)"),
         }
-    }
-}
-
-fn is_flatpak() -> bool {
-    Path::new("/.flatpak-info").exists()
-}
-
-fn host_command(program: &str) -> Command {
-    if is_flatpak() {
-        let mut cmd = Command::new("flatpak-spawn");
-        cmd.arg("--host").arg(program);
-        cmd
-    } else {
-        Command::new(program)
     }
 }
 
@@ -116,20 +100,33 @@ pub fn register_gnome_shortcut(
     run_gsettings_set(&[&relocatable, "command", command])?;
     run_gsettings_set(&[&relocatable, "binding", trimmed_binding])?;
 
+    log_info!(
+        "shortcut",
+        "Registered {:?} shortcut '{}' -> '{}'",
+        kind,
+        trimmed_binding,
+        command
+    );
     Ok(())
 }
 
 pub fn set_gnome_shortcut_binding(kind: ShortcutKind, binding: &str) -> Result<(), String> {
     let relocatable = format!("{CUSTOM_BINDING_SCHEMA}:{}", kind.path());
-    run_gsettings_set(&[&relocatable, "binding", binding])
+    if let Err(e) = run_gsettings_set(&[&relocatable, "binding", binding]) {
+        log_warn!("shortcut", "Failed to set binding '{binding}' for {:?}: {e}", kind);
+        return Err(e);
+    }
+    Ok(())
 }
 
 pub fn open_gnome_keyboard_settings() -> Result<(), String> {
+    log_info!("shortcut", "Opening GNOME keyboard settings");
     host_command("gnome-control-center")
         .arg("keyboard")
         .spawn()
         .map(|_| ())
         .map_err(|e| {
+            log_err!("shortcut", "Unable to open gnome-control-center: {e}");
             format!(
                 "{}: {e}",
                 tr(
@@ -138,6 +135,76 @@ pub fn open_gnome_keyboard_settings() -> Result<(), String> {
                 )
             )
         })
+}
+
+const EXTENSION_JS: &str = include_str!("../gnome-extension/ai-overview-dock@toto/extension.js");
+const EXTENSION_META: &str = include_str!("../gnome-extension/ai-overview-dock@toto/metadata.json");
+
+pub fn is_gnome_extension_installed() -> bool {
+    if is_flatpak() {
+        host_command("sh")
+            .args([
+                "-c",
+                "[ -f \"$HOME/.local/share/gnome-shell/extensions/ai-overview-dock@toto/extension.js\" ]",
+            ])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    } else {
+        dirs::data_local_dir()
+            .map(|d| d.join("gnome-shell/extensions/ai-overview-dock@toto/extension.js").is_file())
+            .unwrap_or(false)
+    }
+}
+
+/// Installs/updates the GNOME Shell extension in `~/.local/share/gnome-shell/extensions/`
+/// and returns `Ok(true)` if `gnome-extensions enable` succeeded immediately,
+/// or `Ok(false)` if a GNOME session restart is needed to discover it.
+pub fn install_gnome_extension() -> Result<bool, String> {
+    let cache_dir = crate::config::Config::cache_dir();
+    std::fs::create_dir_all(&cache_dir)
+        .map_err(|e| format!("create cache dir failed: {e}"))?;
+
+    let tmp_js = cache_dir.join("extension.js");
+    let tmp_meta = cache_dir.join("metadata.json");
+    std::fs::write(&tmp_js, EXTENSION_JS).map_err(|e| format!("write extension.js: {e}"))?;
+    std::fs::write(&tmp_meta, EXTENSION_META).map_err(|e| format!("write metadata.json: {e}"))?;
+
+    let copy_out = host_command("sh")
+        .args([
+            "-c",
+            "dest=\"$HOME/.local/share/gnome-shell/extensions/ai-overview-dock@toto\" && mkdir -p \"$dest\" && cp \"$1\" \"$dest/extension.js\" && cp \"$2\" \"$dest/metadata.json\"",
+            "sh",
+            &tmp_js.to_string_lossy(),
+            &tmp_meta.to_string_lossy(),
+        ])
+        .output()
+        .map_err(|e| format!("install extension failed: {e}"))?;
+
+    let _ = std::fs::remove_file(&tmp_js);
+    let _ = std::fs::remove_file(&tmp_meta);
+
+    if !copy_out.status.success() {
+        let err = String::from_utf8_lossy(&copy_out.stderr).trim().to_string();
+        log_err!("extension", "Failed to copy extension files: {err}");
+        return Err(if err.is_empty() {
+            "Copie de l'extension échouée".to_string()
+        } else {
+            err
+        });
+    }
+
+    let enable_ok = host_command("gnome-extensions")
+        .args(["enable", "ai-overview-dock@toto"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    log_info!(
+        "extension",
+        "Installed ai-overview-dock@toto (enabled_now={enable_ok})"
+    );
+    Ok(enable_ok)
 }
 
 fn run_gsettings_set(args: &[&str]) -> Result<(), String> {

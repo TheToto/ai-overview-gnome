@@ -1,6 +1,6 @@
 [package]
 name = "ai-overview-desktop"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Spotlight-style AI Overview overlay for GNOME using GTK4, Libadwaita, and WebKitGTK"
 

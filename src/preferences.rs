@@ -9,8 +9,8 @@ use crate::config::{ANTIGRAVITY_MODELS, SpeechToText};
 use crate::i18n::tr;
 use crate::provider::Provider;
 use crate::shortcut::{
-    ShortcutKind, build_shortcut_command, open_gnome_keyboard_settings, register_gnome_shortcut,
-    set_gnome_shortcut_binding,
+    ShortcutKind, build_shortcut_command, install_gnome_extension, is_gnome_extension_installed,
+    open_gnome_keyboard_settings, register_gnome_shortcut, set_gnome_shortcut_binding,
 };
 use crate::window::SpotlightController;
 
@@ -227,9 +227,46 @@ pub fn present_preferences(ctrl: &SpotlightController) {
     shortcut_group.add(&voice_provider_row);
     shortcut_group.add(&open_gnome_row);
 
+    // 4. GNOME Shell Extension
+    let ext_installed = is_gnome_extension_installed();
+    let ext_group = adw::PreferencesGroup::builder()
+        .title(tr("GNOME Shell Extension", "Extension GNOME Shell"))
+        .build();
+
+    let ext_row = adw::ActionRow::builder()
+        .title(tr(
+            "Top-center docking (Wayland)",
+            "Ancrage en haut de l'écran (Wayland)",
+        ))
+        .subtitle(if ext_installed {
+            tr(
+                "Installed — click to update",
+                "Installée — cliquez pour mettre à jour",
+            )
+        } else {
+            tr(
+                "Centers the launcher at the top of the screen",
+                "Centre la fenêtre en haut de l'écran",
+            )
+        })
+        .build();
+
+    let ext_btn = gtk4::Button::with_label(if ext_installed {
+        tr("Update", "Mettre à jour")
+    } else {
+        tr("Install", "Installer")
+    });
+    ext_btn.set_valign(gtk4::Align::Center);
+    if !ext_installed {
+        ext_btn.add_css_class("suggested-action");
+    }
+    ext_row.add_suffix(&ext_btn);
+    ext_group.add(&ext_row);
+
     page.add(&general_group);
     page.add(&stt_group);
     page.add(&shortcut_group);
+    page.add(&ext_group);
     dialog.add(&page);
 
     // Wire signals
@@ -324,6 +361,38 @@ pub fn present_preferences(ctrl: &SpotlightController) {
     open_gnome_row.connect_activated(move |_| {
         if let Err(err) = open_gnome_keyboard_settings() {
             dlg_k.add_toast(adw::Toast::new(&err));
+        }
+    });
+
+    let dlg_ext = dialog.clone();
+    let ext_row_c = ext_row.clone();
+    let ext_btn_c = ext_btn.clone();
+    ext_btn.connect_clicked(move |_| match install_gnome_extension() {
+        Ok(enabled_now) => {
+            ext_btn_c.set_label(tr("Update", "Mettre à jour"));
+            ext_btn_c.remove_css_class("suggested-action");
+            ext_row_c.set_subtitle(tr(
+                "Installed — click to update",
+                "Installée — cliquez pour mettre à jour",
+            ));
+            let msg = if enabled_now {
+                tr(
+                    "Extension installed and enabled (log out/in if updating)",
+                    "Extension installée et activée (reconnectez la session si mise à jour)",
+                )
+            } else {
+                tr(
+                    "Extension installed — log out and back in to activate",
+                    "Extension installée — fermez et rouvrez la session pour l'activer",
+                )
+            };
+            dlg_ext.add_toast(adw::Toast::new(msg));
+        }
+        Err(err) => {
+            dlg_ext.add_toast(adw::Toast::new(&format!(
+                "{}: {err}",
+                tr("Error", "Erreur")
+            )));
         }
     });
 

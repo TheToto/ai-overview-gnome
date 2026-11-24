@@ -1,6 +1,6 @@
-use std::io::{BufRead, BufReader};
-use std::process::{Command, Stdio};
-use std::sync::mpsc;
+use std::io::{BufRead, BufReader, Read};
+use std::process::Stdio;
+use std::sync::{OnceLock, mpsc};
 use std::thread;
 
 use gtk4::glib;
@@ -8,22 +8,37 @@ use serde_json::Value;
 
 use crate::i18n::tr;
 
-/// Returns `true` if the Antigravity CLI (`agy`) is available on `PATH`
-/// or in `~/.local/bin/agy`.
+static AGY_AVAILABLE: OnceLock<bool> = OnceLock::new();
+
+/// Returns `true` if the Antigravity CLI (`agy`) is available on the host.
 pub fn is_available() -> bool {
-    if let Some(path_var) = std::env::var_os("PATH") {
-        for dir in std::env::split_paths(&path_var) {
-            if dir.join("agy").is_file() {
-                return true;
-            }
-        }
-    }
-    if let Some(home) = dirs::home_dir() {
-        if home.join(".local/bin/agy").is_file() {
-            return true;
-        }
-    }
-    false
+    *AGY_AVAILABLE.get_or_init(|| {
+        let found = if crate::config::is_flatpak() {
+            crate::config::host_command("sh")
+                .args([
+                    "-lc",
+                    "command -v agy >/dev/null 2>&1 || [ -x \"$HOME/.local/bin/agy\" ]",
+                ])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false)
+        } else {
+            let on_path = std::env::var_os("PATH").is_some_and(|path_var| {
+                std::env::split_paths(&path_var).any(|dir| dir.join("agy").is_file())
+            });
+            let in_local_bin = dirs::home_dir()
+                .is_some_and(|home| home.join(".local/bin/agy").is_file());
+            on_path || in_local_bin
+        };
+        log_info!(
+            "antigravity",
+            "CLI detection: available={found} (flatpak={})",
+            crate::config::is_flatpak()
+        );
+        found
+    })
 }
 
 const DESKTOP_GUARDRAILS_PROMPT: &str = "\
@@ -313,8 +328,18 @@ pub fn spawn_turn(
     };
 
     thread::spawn(move || {
-        let mut cmd = Command::new("agy");
-        if let Some(home) = dirs::home_dir() {
+        log_info!(
+            "antigravity",
+            "Spawning agy turn (model={:?}, auto_approve={}, resume={:?}, flatpak={})",
+            model,
+            auto_approve,
+            conversation_id,
+            crate::config::is_flatpak()
+        );
+        let mut cmd = crate::config::host_command("agy");
+        if !crate::config::is_flatpak()
+            && let Some(home) = dirs::home_dir()
+        {
             cmd.current_dir(home);
         }
         cmd.args(["--output-format", "stream-json"]);
@@ -333,6 +358,7 @@ pub fn spawn_turn(
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
+                log_err!("antigravity", "Failed to spawn agy: {e}");
                 let _ = tx.send(AgyEvent::Error(format!("Impossible de lancer agy : {e}")));
                 return;
             }
@@ -355,13 +381,26 @@ pub fn spawn_turn(
             }
         }
 
+        let stderr_str = child
+            .stderr
+            .take()
+            .and_then(|mut err| {
+                let mut s = String::new();
+                err.read_to_string(&mut s).ok().map(|_| s)
+            })
+            .unwrap_or_default();
+
         let status = child.wait();
         if !finished {
+            if !stderr_str.trim().is_empty() {
+                log_err!("antigravity", "agy stderr: {}", stderr_str.trim());
+            }
             let msg = match status {
                 Ok(s) if s.success() => "Réponse vide de agy".to_string(),
                 Ok(s) => format!("agy terminé avec le code {s}"),
                 Err(e) => format!("Erreur d'attente agy : {e}"),
             };
+            log_err!("antigravity", "agy ended unexpectedly: {msg}");
             let _ = tx.send(AgyEvent::Error(msg));
         }
     });

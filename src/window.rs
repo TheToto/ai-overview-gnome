@@ -78,6 +78,7 @@ struct SpotlightInner {
     hold_guard: RefCell<Option<gio::ApplicationHoldGuard>>,
     syncing_ui: RefCell<bool>,
     has_antigravity: bool,
+    awaiting_captcha: Cell<bool>,
 }
 
 impl SpotlightController {
@@ -363,6 +364,7 @@ impl SpotlightController {
                 hold_guard: RefCell::new(initial_hold),
                 syncing_ui: RefCell::new(false),
                 has_antigravity,
+                awaiting_captcha: Cell::new(false),
             }),
         };
 
@@ -576,7 +578,7 @@ impl SpotlightController {
             wv.reload();
         });
 
-        // Progress bar binding
+        // Progress bar binding & load failure logging
         let pb = progress_bar.clone();
         self.inner
             .webview
@@ -585,11 +587,43 @@ impl SpotlightController {
                 pb.set_fraction(p);
                 pb.set_visible(p > 0.0 && p < 1.0);
             });
+        self.inner
+            .webview
+            .connect_load_failed(|_, _, failing_uri, error| {
+                log_err!("webview", "Load failed for {failing_uri}: {error}");
+                false
+            });
 
-        // Inject Gemini prompt when page finishes loading + screenshot/followup test hooks
+        // Inject Gemini prompt when page finishes loading + CAPTCHA WebView fallback/recovery + test hooks
         let ctrl = self.clone();
         self.inner.webview.connect_load_changed(move |wv, event| {
+            let uri = wv.uri().map(|u| u.to_string()).unwrap_or_default();
+            if (event == LoadEvent::Committed || event == LoadEvent::Finished)
+                && uri.contains("google.com/sorry")
+            {
+                if !ctrl.inner.awaiting_captcha.get() {
+                    log_warn!("webview", "CAPTCHA detected ({uri}), switching to Web View");
+                    ctrl.inner.awaiting_captcha.set(true);
+                    ctrl.set_web_view_mode(true);
+                }
+                return;
+            }
+
             if event != LoadEvent::Finished {
+                return;
+            }
+
+            if ctrl.inner.awaiting_captcha.get() {
+                log_info!("webview", "CAPTCHA solved ({uri}), reloading and resuming reader");
+                ctrl.inner.awaiting_captcha.set(false);
+                let provider = Provider::from_index(ctrl.inner.provider_dropdown.selected());
+                if provider == Provider::GoogleAiMode {
+                    ctrl.set_web_view_mode(false);
+                    let generation = ctrl.inner.query_generation.get().wrapping_add(1);
+                    ctrl.inner.query_generation.set(generation);
+                    wv.reload();
+                    ctrl.start_ai_mode_polling(generation, None);
+                }
                 return;
             }
             if let Some(prompt) = ctrl.inner.pending_gemini_prompt.borrow_mut().take() {
@@ -884,7 +918,7 @@ impl SpotlightController {
         let total_ticks = Rc::new(Cell::new(0u32));
 
         glib::timeout_add_local(Duration::from_millis(150), move || {
-            if ctrl.inner.query_generation.get() != generation {
+            if ctrl.inner.query_generation.get() != generation || ctrl.inner.awaiting_captcha.get() {
                 return glib::ControlFlow::Break;
             }
 
@@ -932,6 +966,12 @@ impl SpotlightController {
                 return glib::ControlFlow::Break;
             }
             if ticks >= 80 {
+                log_warn!(
+                    "ai_mode",
+                    "Polling timed out (last_len={}), falling back to webview={}",
+                    last_len.get(),
+                    last_len.get() == 0
+                );
                 ctrl.finish_active_loading();
                 if last_len.get() == 0 {
                     ctrl.set_web_view_mode(true);
@@ -1150,10 +1190,9 @@ impl SpotlightController {
                 });
             }
             Err(err) => {
-                self.inner.search_entry.set_placeholder_text(Some(&format!(
-                    "{}: {err}",
-                    crate::i18n::tr("Microphone unavailable", "Micro indisponible")
-                )));
+                log_err!("voice", "start_voice_recording failed: {err}");
+                self.inner.search_entry.set_text("");
+                self.inner.search_entry.set_placeholder_text(Some(&err));
                 self.focus_search();
             }
         }
@@ -1197,9 +1236,12 @@ impl SpotlightController {
                     ctrl.inner.input_stack.set_visible_child_name("search");
                     match result {
                         Ok(text) if !text.is_empty() => {
+                            log_info!("voice", "Submitting transcribed query ({} chars)", text.chars().count());
                             ctrl.submit_query(&text, None);
                         }
                         Ok(_) => {
+                            log_warn!("voice", "Transcription returned empty text");
+                            ctrl.inner.search_entry.set_text("");
                             ctrl.inner.search_entry.set_placeholder_text(Some(
                                 crate::i18n::tr(
                                     "No speech detected — try again",
@@ -1209,6 +1251,8 @@ impl SpotlightController {
                             ctrl.focus_search();
                         }
                         Err(err) => {
+                            log_err!("voice", "Transcription error: {err}");
+                            ctrl.inner.search_entry.set_text("");
                             ctrl.inner
                                 .search_entry
                                 .set_placeholder_text(Some(&err));
@@ -1219,9 +1263,17 @@ impl SpotlightController {
                 }
                 Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
                 Err(mpsc::TryRecvError::Disconnected) => {
+                    log_err!("voice", "Transcription worker channel disconnected");
                     ctrl.inner.is_transcribing.set(false);
                     ctrl.inner.mic_btn.set_sensitive(true);
                     ctrl.inner.input_stack.set_visible_child_name("search");
+                    ctrl.inner.search_entry.set_text("");
+                    ctrl.inner.search_entry.set_placeholder_text(Some(
+                        crate::i18n::tr(
+                            "Transcription interrupted unexpectedly",
+                            "Transcription interrompue de façon inattendue",
+                        ),
+                    ));
                     ctrl.focus_search();
                     glib::ControlFlow::Break
                 }
@@ -1339,6 +1391,12 @@ impl SpotlightController {
 
         let generation = self.inner.query_generation.get().wrapping_add(1);
         self.inner.query_generation.set(generation);
+        self.inner.awaiting_captcha.set(false);
+        log_info!(
+            "query",
+            "Submitting query (provider={provider:?}, len={}, gen={generation})",
+            trimmed.chars().count()
+        );
 
         self.inner.search_entry.set_text(trimmed);
         self.expand_results_area();
@@ -1400,6 +1458,12 @@ impl SpotlightController {
 
         let generation = self.inner.query_generation.get().wrapping_add(1);
         self.inner.query_generation.set(generation);
+        self.inner.awaiting_captcha.set(false);
+        log_info!(
+            "query",
+            "Submitting follow-up (provider={provider:?}, len={}, gen={generation})",
+            trimmed.chars().count()
+        );
 
         self.inner.followup_entry.set_text("");
         self.finish_active_loading();
@@ -1460,9 +1524,18 @@ impl SpotlightController {
             loop {
                 match rx.try_recv() {
                     Ok(AgyEvent::Init(id)) => {
+                        log_info!("antigravity", "Turn initialized conv_id={id}");
                         *ctrl.inner.antigravity_conv_id.borrow_mut() = Some(id);
                     }
                     Ok(AgyEvent::ToolStep(step)) => {
+                        log_info!(
+                            "antigravity",
+                            "Tool step #{} [{}] {}: {}",
+                            step.step_index,
+                            step.state,
+                            step.tool_name,
+                            step.summary
+                        );
                         if let Some(lbl) = ctrl.inner.active_loading_label.borrow().as_ref() {
                             lbl.set_text(&format!("⚙ {}…", step.summary));
                         }
@@ -1594,6 +1667,12 @@ impl SpotlightController {
                             };
                             outer_exp.set_label(Some(&format!("⚙ {total} {noun} {done_word}")));
                         }
+                        log_info!(
+                            "antigravity",
+                            "Turn done (response_len={}, tools={})",
+                            ctrl.inner.last_plain_text.borrow().chars().count(),
+                            step_widgets.borrow().len()
+                        );
                         ctrl.finish_active_loading();
                         ctrl.scroll_to_bottom();
                         if let Some(path) = ctrl.inner.screenshot_path.borrow_mut().take() {
@@ -1605,6 +1684,7 @@ impl SpotlightController {
                         return glib::ControlFlow::Break;
                     }
                     Ok(AgyEvent::Error(err)) => {
+                        log_err!("antigravity", "Turn error: {err}");
                         let total = step_widgets.borrow().len();
                         if total > 0
                             && let Some(outer_exp) = tools_expander.as_ref()
@@ -1629,6 +1709,7 @@ impl SpotlightController {
                     }
                     Err(std::sync::mpsc::TryRecvError::Empty) => break,
                     Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        log_warn!("antigravity", "Event channel disconnected");
                         ctrl.finish_active_loading();
                         return glib::ControlFlow::Break;
                     }
@@ -1660,6 +1741,8 @@ impl SpotlightController {
     pub fn open_login(&self) {
         let generation = self.inner.query_generation.get().wrapping_add(1);
         self.inner.query_generation.set(generation);
+        self.inner.awaiting_captcha.set(false);
+        log_info!("webview", "Opening Google login (gen={generation})");
         *self.inner.pending_gemini_prompt.borrow_mut() = None;
         self.expand_results_area();
         self.inner.web_toggle.set_visible(false);

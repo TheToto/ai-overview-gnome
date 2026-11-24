@@ -112,19 +112,52 @@ impl Config {
     pub fn load() -> Self {
         let path = Self::config_path();
         let Ok(raw) = fs::read_to_string(&path) else {
+            log_info!("config", "No config at {}, using defaults", path.display());
             return Self::default();
         };
-        toml::from_str(&raw).unwrap_or_default()
+        match toml::from_str(&raw) {
+            Ok(cfg) => {
+                log_info!("config", "Loaded config from {}", path.display());
+                cfg
+            }
+            Err(e) => {
+                log_warn!("config", "Invalid config at {} ({e}), using defaults", path.display());
+                Self::default()
+            }
+        }
     }
 
     pub fn save(&self) -> Result<(), String> {
         let path = Self::config_path();
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("create config dir: {e}"))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                log_err!("config", "create config dir failed: {e}");
+                format!("create config dir: {e}")
+            })?;
         }
-        let body = toml::to_string_pretty(self).map_err(|e| format!("serialize config: {e}"))?;
-        fs::write(&path, body).map_err(|e| format!("write config: {e}"))?;
+        let body = toml::to_string_pretty(self).map_err(|e| {
+            log_err!("config", "serialize config failed: {e}");
+            format!("serialize config: {e}")
+        })?;
+        fs::write(&path, body).map_err(|e| {
+            log_err!("config", "write config failed: {e}");
+            format!("write config: {e}")
+        })?;
         Ok(())
+    }
+}
+
+pub fn is_flatpak() -> bool {
+    std::path::Path::new("/.flatpak-info").exists()
+}
+
+pub fn host_command(program: &str) -> std::process::Command {
+    if is_flatpak() {
+        let mut cmd = std::process::Command::new("flatpak-spawn");
+        cmd.arg("--host").arg(program);
+        cmd
+    } else {
+        std::process::Command::new(program)
     }
 }
 

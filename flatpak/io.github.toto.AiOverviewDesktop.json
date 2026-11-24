@@ -13,6 +13,7 @@
     "--socket=wayland",
     "--socket=fallback-x11",
     "--socket=pulseaudio",
+    "--filesystem=xdg-run/pipewire-0",
     "--device=dri",
     "--talk-name=org.freedesktop.Flatpak"
   ],

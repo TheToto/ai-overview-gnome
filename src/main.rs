@@ -1,3 +1,6 @@
+#[macro_use]
+mod logging;
+
 mod antigravity;
 mod config;
 mod extractor;
@@ -25,6 +28,16 @@ use crate::provider::Provider;
 use crate::window::SpotlightController;
 
 fn main() -> glib::ExitCode {
+    logging::init();
+    log_info!(
+        "main",
+        "Starting {} v{} (flatpak={}, log={})",
+        APP_ID,
+        env!("CARGO_PKG_VERSION"),
+        config::is_flatpak(),
+        logging::log_path().display()
+    );
+
     let args = prepare_args_with_stdin();
     let is_screenshot = args
         .iter()
@@ -75,21 +88,25 @@ fn main() -> glib::ExitCode {
         }
 
         if opts.contains("login") {
+            log_info!("cli", "Opening Google login");
             controller.open_login();
             return 0.into();
         }
 
         if opts.contains("preferences") {
+            log_info!("cli", "Opening preferences");
             controller.open_preferences();
             return 0.into();
         }
 
         if opts.contains("clipboard") {
+            log_info!("cli", "Submitting query from clipboard");
             controller.submit_from_clipboard();
             return 0.into();
         }
 
         if opts.contains("voice") {
+            log_info!("cli", "Opening Spotlight in voice mode (provider={provider_override:?})");
             controller.present_and_trigger_voice(provider_override);
             return 0.into();
         }
